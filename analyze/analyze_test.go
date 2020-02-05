@@ -124,8 +124,6 @@ func main() {
 
 	var a Analyzer
 	problems, _ := a.Analyze(log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile), "t.go", []byte(testsrc))
-	//si, f := createASTFromSrc(testsrc, t)
-	//f.storeInfo(si)
 
 	if len(problems) != 3 {
 		t.Error("Failed to detect problems")
@@ -356,7 +354,7 @@ func TestFieldDeclaration(t *testing.T) {
 
 		if fn == "setValue" {
 			t.globalValue = args[0]
-			shim.PutState("key", []byte(t.globalValue))
+			stub.PutState("key", []byte(t.globalValue))
 			return shim.Success([]byte("success"))
 		} else if fn == "getValue" {
 			value, _ := shim.GetState("key")
@@ -384,50 +382,181 @@ func TestFieldDeclaration(t *testing.T) {
 	}
 }
 
-// TODO: Modify Test
-func TestPointer(t *testing.T) {
-}
-
 func TestSysCom(t *testing.T) {
-}
+	testsrc := `
+	package main
 
-func TestCrossChan(t *testing.T) {
-}
+	import (
+	"os/exec"
+	"github.com/hyperledger/fabric/core/chaincode/shim"
+	pb "github.com/hyperledger/fabric/protos/peer"
+	)
+	
+	type SimpleChaincode struct {}
 
-func TestReadFile(t *testing.T) {
-}
+	func (t *SimpleChaincode) example(stub shim.ChaincodeStubInterface, key string) pb.Response {
+		out, err:= exec.Command("date").Output()
+		if err != nil {
+			shim.Error("error")
+		}
+		err = stub.PutState(key, out)
+		if err != nil {
+			shim.Error("error")
+		}
+		return shim.Success(nil)
+	}
+	`
 
-func TestReadYourWrite(t *testing.T) {
-	//testsrc := "../test/RiskQuery.go"
-	//si, f := createASTFromFileName(testsrc, t)
-	//f.checkGlobalVar(si)
-	//f.storeInfo(si)
-	//f.detectProblems(si)
-	//if len(si.problems) > 0 {
-	//	got := si.problems[0]
-	//	if got.Category != "ReadYourWrite" || got.VarName != "" || got.Function != "ReadYourWrite" {
-	//		t.Error("checkReadYourWrite failed: different problems are found", got)
-	//	}
-	//} else {
-	//	t.Error("checkReadYourWrite failed: any problem is not found")
-	//}
-}
-
-func TestRangeQuery(t *testing.T) {
-	testsrc := "../test/RiskQuery.go"
-	si, f := createASTFromFileName(testsrc, t)
+	si, f := createASTFromSrc(testsrc, t)
 	f.checkImports(si)
-	f.checkGlobalVar(si)
-	f.checkFieldDeclaration(si)
-	f.checkImports(si)
-	f.checkGlobalVar(si)
-	f.checkFieldDeclaration(si)
-
 	f.storeInfo(si)
 	f.detectProblems(si)
 	if len(si.problems) > 0 {
 		got := si.problems[0]
-		if got.Category != "RangeQuery" || got.VarName != "content" || got.Function != "initLedger" {
+		if got.Category != "SysCom" || got.VarName != "out" || got.Function != "example" {
+			t.Error("SysCom failed: different problems are found", got)
+		}
+	} else {
+		t.Error("SysCom failed: any problem is not found")
+	}
+}
+
+func TestReadFile(t *testing.T) {
+	testsrc := `
+	package main
+
+	import (
+		"io/ioutil"
+	"github.com/hyperledger/fabric/core/chaincode/shim"
+	pb "github.com/hyperledger/fabric/protos/peer"
+	)
+
+	type SimpleChaincode struct {}
+
+	func (t *SimpleChaincode) example(stub shim.ChaincodeStubInterface, filename string) pb.Response {
+		bytes := ioutil.ReadFile(filename)
+		err := stub.PutState("filecontent", bytes)
+		if err != nil {
+			return shim.Error("error")
+		}
+		return shim.Success(nil)
+	}
+	`
+
+	si, f := createASTFromSrc(testsrc, t)
+	f.checkImports(si)
+	f.storeInfo(si)
+	f.detectProblems(si)
+	if len(si.problems) > 0 {
+		got := si.problems[0]
+		if got.Category != "ReadFile" || got.VarName != "bytes" || got.Function != "example" {
+			t.Error("ReadFile failed: different problems are found", got)
+		}
+	} else {
+		t.Error("ReadFile failed: any problem is not found")
+	}
+}
+
+func TestCrossChan(t *testing.T) {
+	testsrc := `
+	package main
+
+	import (
+	"github.com/hyperledger/fabric/core/chaincode/shim"
+	pb "github.com/hyperledger/fabric/protos/peer"
+	)
+	
+	type SimpleChaincode struct {}
+
+	func (t *SimpleChaincode) example(stub shim.ChaincodeStubInterface, ccname, channame string, arg []byte) pb.Response {
+		res := stub.InvokeChaincode(ccname, arg, channame)
+		if res == "test" {
+			return shim.Success(nil)
+		}
+	}
+	`
+	si, f := createASTFromSrc(testsrc, t)
+	f.checkImports(si)
+	f.storeInfo(si)
+	f.detectProblems(si)
+	if len(si.problems) > 0 {
+		got := si.problems[0]
+		if got.Category != "CrossChan" || got.VarName != "res" || got.Function != "example" {
+			t.Error("CrossChan failed: different problems are found", got)
+		}
+	} else {
+		t.Error("CrossChan failed: any problem is not found")
+	}
+}
+
+func TestReadYourWrite(t *testing.T) {
+	testsrc := `
+	package main
+
+	import (
+	"github.com/hyperledger/fabric/core/chaincode/shim"
+	pb "github.com/hyperledger/fabric/protos/peer"
+	)
+	
+	type SimpleChaincode struct {}
+
+	func (t *SimpleChaincode) example(stub shim.ChaincodeStubInterface, queryString string) pb.Response {
+		err := stub.PutState(queryString, "newValue")
+		if err != nil {
+			return shim.Error("Failed to put newValue")
+		}
+
+		val, _ := stub.GetState(queryString)
+		
+		if val == "newValue" {
+			return shim.Success(nil)
+		}
+	}
+	`
+	si, f := createASTFromSrc(testsrc, t)
+	f.checkImports(si)
+	f.storeInfo(si)
+	f.detectProblems(si)
+	if len(si.problems) > 0 {
+		got := si.problems[0]
+		if got.Category != "ReadYourWrite" || got.VarName != "" || got.Function != "example" {
+			t.Error("checkReadYourWrite failed: different problems are found", got)
+		}
+	} else {
+		t.Error("checkReadYourWrite failed: any problem is not found")
+	}
+}
+
+func TestRangeQuery(t *testing.T) {
+	testsrc := `
+	package main
+
+	import (
+	"github.com/hyperledger/fabric/core/chaincode/shim"
+	pb "github.com/hyperledger/fabric/protos/peer"
+	)
+	
+	type SimpleChaincode struct {}
+
+	func (t *SimpleChaincode) example(stub shim.ChaincodeStubInterface, queryString string) pb.Response {
+	iter, _ := stub.GetQueryResult(queryString)
+	for iter.HasNext() {
+		res, _ := iter.Next()
+	}
+
+	iter.Close()
+	return shim.Success(nil)
+	}
+	`
+	si, f := createASTFromSrc(testsrc, t)
+	f.checkImports(si)
+	f.checkGlobalVar(si)
+	f.checkFieldDeclaration(si)
+	f.storeInfo(si)
+	f.detectProblems(si)
+	if len(si.problems) > 0 {
+		got := si.problems[0]
+		if got.Category != "RangeQuery" || got.VarName != "iter" || got.Function != "example" {
 			t.Error("checkRangeQuery failed: different problems are found", got)
 		}
 	} else {
