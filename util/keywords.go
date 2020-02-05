@@ -37,10 +37,10 @@ var Keywords = map[string]map[string]bool{
 	},
 	"ReadFile": {
 		// os
-		"ReadFile": true,
-		// io/ioutil
 		"Open":     true,
 		"OpenFile": true,
+		// io/ioutil
+		"ReadFile": true,
 	},
 	"RangeQuery": {
 		"GetHistoryForKey": true,
