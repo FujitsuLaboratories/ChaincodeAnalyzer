@@ -12,8 +12,6 @@ import (
 	analyzer "github.com/FujitsuLaboratories/ChaincodeAnalyzer/analyze"
 )
 
-// Reference: github.com/golang/lint
-
 func usage() {
 	fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
 	fmt.Fprintf(os.Stderr, "\tccanalyzer [files]\n")
