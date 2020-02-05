@@ -712,18 +712,19 @@ func walkStmt(si *storedInfo, n ast.Stmt) {
 
 // walk funcdecl to extract information about the func
 func (f *file) walkFuncDecl(si *storedInfo, n *ast.FuncDecl) {
-	var recv, params map[string]ast.Expr
+	recv := make(map[string]ast.Expr)
+	params := make(map[string]ast.Expr)
 	funcname := n.Name.Name
 
 	// if method
 	if n.Recv != nil {
-		recv = map[string]ast.Expr{n.Recv.List[0].Names[0].Name: n.Recv.List[0].Type}
+		recv[n.Recv.List[0].Names[0].Name] = n.Recv.List[0].Type
 	}
 
 	// params
 	for _, field := range n.Type.Params.List {
 		for _, name := range field.Names {
-			params = map[string]ast.Expr{name.Name: field.Type}
+			params[name.Name] = field.Type
 		}
 	}
 
@@ -809,8 +810,8 @@ func isSameKey(si *storedInfo, a, b ast.Expr, fcname string) bool {
 							return false
 						}
 					}
-					return true
 				}
+				return true
 			}
 			return false
 		default:
@@ -896,7 +897,7 @@ func (f *file) checkSelectorExprInCallExpr(si *storedInfo, t *ast.SelectorExpr, 
 		case "API":
 			// for client, e.g., client = &http.Client{}; client.Get()
 			ret = checkAPI(si, t, targetFuncName, targetVarName, x.Name, origPos)
-		case "RangeQuery":
+		case "RangeQuery", "CrossChan":
 			if expr, ok := si.functions[targetFuncName].params[x.Name]; ok {
 				if se, ok := expr.(*ast.SelectorExpr); ok {
 					if se.X.(*ast.Ident).Name == si.importMap[util.LibFullPath[category][0]] {
@@ -916,9 +917,11 @@ func (f *file) checkSelectorExprInCallExpr(si *storedInfo, t *ast.SelectorExpr, 
 					ret = true
 				}
 			}
-			// e.g., t := time.Now(); a := t.Format()
-			ret = ret || f.checkAssignOps(si, targetFuncName, x.Name, category, origPos)
 		}
+		// e.g., t := time.Now(); a := t.Format()
+		ret = ret || f.checkAssignOps(si, targetFuncName, x.Name, category, origPos)
+	case *ast.CallExpr:
+		ret = f.checkNonDetermin(si, targetFuncName, targetVarName, category, "SelectorExpr", x, origPos)
 	default:
 		name := util.IdName(x)
 		ret = f.checkAssignOps(si, targetFuncName, name, category, origPos)
