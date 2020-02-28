@@ -45,4 +45,4 @@ For more information about risks, please refer the [paper](https://ieeexplore.ie
 - Cross channel Invocation 
 
 ## License
-This tool is distributed under the MIT License, see [LICENSE](./LICENSE) file.
+This tool is distributed under the Apache License Version 2.0, see [LICENSE](./LICENSE) file.
